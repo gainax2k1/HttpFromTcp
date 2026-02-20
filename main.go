@@ -14,6 +14,14 @@ func main() {
 	}
 	defer msgs.Close()
 
+	// lines is a channel that will receive lines read from the file
+	lines := getLinesChannel(msgs)
+
+	for line := range lines {
+		fmt.Printf("read: %s\n", line)
+	}
+
+	/* original code without channel:
 	msgBuffer := make([]byte, 8)
 	var currentLine string
 
@@ -53,4 +61,49 @@ func main() {
 	if len(currentLine) > 0 {
 		fmt.Printf("read: %s\n", currentLine)
 	}
+	*/
+}
+
+func getLinesChannel(f io.ReadCloser) <-chan string {
+	lines := make(chan string)
+
+	go func() {
+		// Close the channel when the goroutine exits
+		defer close(lines)
+		defer f.Close()
+
+		buf := make([]byte, 8)
+		var currentLine string
+
+		for {
+			bytesRead, err := f.Read(buf)
+			if bytesRead > 0 {
+				currentLine += string(buf[:bytesRead])
+				if strings.Contains(currentLine, "\n") {
+					splitStrings := strings.Split(currentLine, "\n")
+					for i, line := range splitStrings {
+						if i == len(splitStrings)-1 {
+							currentLine = line
+						} else {
+							lines <- line
+						}
+					}
+
+				}
+			}
+
+			if err != nil {
+				if err == io.EOF {
+					break // end of file reached, exit loop.
+				}
+				panic(err)
+			}
+		}
+		if len(currentLine) > 0 {
+			lines <- currentLine
+		}
+
+	}()
+
+	return lines
 }
