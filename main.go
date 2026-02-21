@@ -3,66 +3,47 @@ package main
 import (
 	"fmt"
 	"io"
-	"os"
+	"log"
+	"net"
 	"strings"
 )
 
 func main() {
+	/* old method from file
 	msgs, err := os.Open("messages.txt")
 	if err != nil {
 		panic(err)
 	}
 	defer msgs.Close()
-
-	// lines is a channel that will receive lines read from the file
-	lines := getLinesChannel(msgs)
-
-	for line := range lines {
-		fmt.Printf("read: %s\n", line)
+	*/
+	const port = ":42069"
+	listener, err := net.Listen("tcp", port)
+	if err != nil {
+		log.Fatalf("error: %s\n", err)
 	}
+	defer listener.Close()
 
-	/* original code without channel:
-	msgBuffer := make([]byte, 8)
-	var currentLine string
+	fmt.Println("Listening on", port)
 
 	for {
-		bytesRead, err := msgs.Read(msgBuffer)
-
-		if bytesRead > 0 {
-			currentLine += string(msgBuffer[:bytesRead])
-			//check for newlines in currentLine
-			if strings.Contains(currentLine, "\n") {
-				//split currentLine by newlines
-				splitStrings := strings.Split(currentLine, "\n")
-
-				for i, line := range splitStrings {
-					//  print each line except the last one, which may be incomplete
-					if i == len(splitStrings)-1 {
-						// last line, may be incomplete, save it for the next read
-						currentLine = line
-					} else {
-						fmt.Printf("read: %s\n", line)
-					}
-				}
-
-			}
-
-		}
-
+		conn, err := listener.Accept()
 		if err != nil {
-			if err == io.EOF {
-				break // end of file reached, exit loop.
-			}
 			panic(err)
 		}
 
+		fmt.Printf("Accepted connection from %s\n", conn.RemoteAddr())
+
+		linesChan := getLinesChannel(conn)
+		for line := range linesChan {
+			fmt.Println(line)
+		}
+
+		fmt.Println("Closed connection from", conn.RemoteAddr())
 	}
-	// print any remaining text in currentLine after the loop (in case last line does not end with a newline)
-	if len(currentLine) > 0 {
-		fmt.Printf("read: %s\n", currentLine)
-	}
-	*/
+
 }
+
+// lines is a channel that will receive lines read from the file
 
 func getLinesChannel(f io.ReadCloser) <-chan string {
 	lines := make(chan string)
@@ -85,6 +66,7 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 						if i == len(splitStrings)-1 {
 							currentLine = line
 						} else {
+							// Send the line to the channel
 							lines <- line
 						}
 					}
@@ -100,6 +82,7 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 			}
 		}
 		if len(currentLine) > 0 {
+			// Send any remaining text in currentLine to the channel
 			lines <- currentLine
 		}
 
