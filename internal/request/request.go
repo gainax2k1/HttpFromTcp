@@ -6,6 +6,24 @@ import (
 	"strings"
 )
 
+/*
+Flow of control:
+
+RequestFromReader: Manages the buffer and reading from the network.
+ It calls r.parse() with whatever data has accumulated so far.
+
+r.parse(): The state machine. It looks at the current state and decides
+  what to parse next. In the initialized state, it calls parseRequestLine().
+  In future lessons when you add headers, it might call parseHeaders() instead
+  depending on the state.
+
+parseRequestLine(): A pure parsing function. It just takes bytes,
+ tries to find and parse a request line, and returns the result.
+ It doesn't know or care about state — it just answers: "Is there a complete
+ request line here? If so, here it is and here's how many bytes I consumed."
+
+*/
+
 const bufferSize = 8
 
 type parserState int
@@ -28,7 +46,9 @@ type RequestLine struct {
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
 
-	// read from reader in chunks and try to parse the request line until we have enough data to parse it, then return the request
+	/* read from reader in chunks and try to parse the request line
+	until we have enough data to parse it, then return the request
+	*/
 
 	buf := make([]byte, bufferSize)
 
